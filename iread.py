@@ -59,6 +59,9 @@ def main():
     parser = create_argument_parser()
     user_args = vars(parser.parse_args())
 
+    if not user_args['check']:
+        parser.print_help()
+
     check_args(user_args)
 
 
