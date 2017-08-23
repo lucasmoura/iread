@@ -6,9 +6,15 @@ import sqlitedict
 DATABASE_PATH = 'articles.sqlite'
 
 
-def check_article(article):
+def format_article_name(article):
     if article.endswith('.pdf'):
         article = article[:-4]
+
+    return article
+
+
+def check_article(article):
+    article = format_article_name(article)
 
     with sqlitedict.SqliteDict(DATABASE_PATH) as dataset:
         is_read = dataset.get(article, False)
@@ -16,9 +22,21 @@ def check_article(article):
     return is_read
 
 
+def remove_article(article):
+    article = format_article_name(article)
+
+    is_read = check_article(article)
+    if not is_read:
+        return False
+
+    with sqlitedict.SqliteDict(DATABASE_PATH) as dataset:
+        dataset[article] = False
+
+    return True
+
+
 def add_article(article):
-    if article.endswith('.pdf'):
-        article = article[:-4]
+    article = format_article_name(article)
 
     with sqlitedict.SqliteDict(DATABASE_PATH, autocommit=True) as dataset:
         dataset.setdefault(article, True)
@@ -39,6 +57,12 @@ def create_argument_parser():
                         type=str,
                         help='mark an article as read')
 
+    parser.add_argument('-u',
+                        '--unmark',
+                        type=str,
+                        help=('Remove article from dataset. The article will \
+                               no longer be marked as read'))
+
     return parser
 
 
@@ -53,14 +77,25 @@ def check_args(user_args):
 
         if is_added:
             print('Article {} marked as read'.format(article))
+    elif user_args['unmark']:
+        article = user_args['unmark']
+        is_removed = remove_article(article)
+
+        if not is_removed:
+            print('Article {} was never marked as read'.format(article))
+        else:
+            print('Article {} successfully unmarked!'.format(article))
 
 
 def main():
     parser = create_argument_parser()
     user_args = vars(parser.parse_args())
 
-    if not user_args['check']:
+    user_vars = [bool(value) for key, value in user_args.items()]
+
+    if True not in user_vars:
         parser.print_help()
+        return
 
     check_args(user_args)
 
