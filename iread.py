@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import argparse
+import glob
+import os
 import sqlitedict
 
 
@@ -11,6 +13,24 @@ def format_article_name(article):
         article = article[:-4]
 
     return article
+
+
+def perform_check(article):
+    if os.path.isfile(article):
+        is_read = check_article(article)
+        print(is_read)
+    elif os.path.isdir(article):
+        return check_dir(article)
+
+
+def check_dir(article_dir):
+    pdf_files = glob.glob(article_dir + '*.pdf')
+    output_str = "Articles in directory:\n\n"
+    for article in pdf_files:
+        is_read = check_article(article.split('/')[1])
+        output_str += '{}...........{}\n'.format(article, is_read)
+
+    print(output_str)
 
 
 def check_article(article):
@@ -69,8 +89,7 @@ def create_argument_parser():
 def check_args(user_args):
     if user_args['check']:
         article = user_args['check'][0]
-        is_read = check_article(article)
-        print(is_read)
+        perform_check(article)
     elif user_args['add']:
         article = user_args['add']
         is_added = add_article(article)
