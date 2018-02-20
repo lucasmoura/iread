@@ -2,10 +2,10 @@
 import argparse
 import glob
 import os
-import sqlitedict
+import sqlite3
 
 
-DATABASE_PATH = 'articles.sqlite'
+DATABASE_PATH = '/home/lucas/.iread/articles'
 
 
 def format_article_name(article):
@@ -15,9 +15,9 @@ def format_article_name(article):
     return article
 
 
-def perform_check(article):
+def perform_check(dataset, article):
     if os.path.isfile(article):
-        is_read = check_article(article)
+        is_read = check_article(dataset, article)
         print(is_read)
     elif os.path.isdir(article):
         return check_dir(article)
@@ -33,35 +33,79 @@ def check_dir(article_dir):
     print(output_str)
 
 
-def check_article(article):
+def check_article(dataset, article):
     article = format_article_name(article)
 
-    with sqlitedict.SqliteDict(DATABASE_PATH) as dataset:
-        is_read = dataset.get(article, False)
+    cursor = dataset.cursor()
+    cursor.execute(
+            '''
+            SELECT name
+            FROM articles
+            WHERE name = ?
+            ''', (article,)
+    )
+
+    is_read = True
+
+    if len(cursor.fetchall()) == 0:
+        is_read = False
 
     return is_read
 
 
-def remove_article(article):
+def remove_article(dataset, article):
     article = format_article_name(article)
 
-    is_read = check_article(article)
+    is_read = check_article(dataset, article)
     if not is_read:
         return False
 
-    with sqlitedict.SqliteDict(DATABASE_PATH) as dataset:
-        dataset[article] = False
+    cursor = dataset.cursor()
+    cursor.execute(
+        '''DELETE
+           FROM articles
+           WHERE name = ? ''', (article,))
+    dataset.commit()
 
     return True
 
 
-def add_article(article):
+def add_article(dataset, article):
     article = format_article_name(article)
 
-    with sqlitedict.SqliteDict(DATABASE_PATH, autocommit=True) as dataset:
-        dataset.setdefault(article, True)
+    cursor = dataset.cursor()
+    cursor.execute(
+            '''
+            INSERT INTO articles(name)
+            VALUES(:name)
+            ''', {'name': article}
+    )
+    dataset.commit()
 
     return True
+
+
+def create_dataset():
+    dataset = sqlite3.connect(DATABASE_PATH)
+    cursor = dataset.cursor()
+
+    cursor.execute(
+        '''
+        CREATE TABLE articles(id INTEGER PRIMARY_KEY, name TEXT)
+        '''
+    )
+
+    dataset.commit()
+    return dataset
+
+
+def check_dataset():
+    if not os.path.exists(DATABASE_PATH):
+        dataset = create_dataset()
+    else:
+        dataset = sqlite3.connect(DATABASE_PATH)
+
+    return dataset
 
 
 def create_argument_parser():
@@ -77,8 +121,8 @@ def create_argument_parser():
                         type=str,
                         help='mark an article as read')
 
-    parser.add_argument('-u',
-                        '--unmark',
+    parser.add_argument('-d',
+                        '--delete',
                         type=str,
                         help=('Remove article from dataset. The article will \
                                no longer be marked as read'))
@@ -86,19 +130,19 @@ def create_argument_parser():
     return parser
 
 
-def check_args(user_args):
+def check_args(user_args, dataset):
     if user_args['check']:
         article = user_args['check'][0]
-        perform_check(article)
+        perform_check(dataset, article)
     elif user_args['add']:
         article = user_args['add']
-        is_added = add_article(article)
+        is_added = add_article(dataset, article)
 
         if is_added:
             print('Article {} marked as read'.format(article))
-    elif user_args['unmark']:
-        article = user_args['unmark']
-        is_removed = remove_article(article)
+    elif user_args['delete']:
+        article = user_args['delete']
+        is_removed = remove_article(dataset, article)
 
         if not is_removed:
             print('Article {} was never marked as read'.format(article))
@@ -116,7 +160,9 @@ def main():
         parser.print_help()
         return
 
-    check_args(user_args)
+    dataset = check_dataset()
+    check_args(user_args, dataset)
+    dataset.close()
 
 
 if __name__ == '__main__':
