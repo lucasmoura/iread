@@ -20,14 +20,14 @@ def perform_check(dataset, article):
         is_read = check_article(dataset, article)
         print(is_read)
     elif os.path.isdir(article):
-        return check_dir(article)
+        return check_dir(dataset, article)
 
 
-def check_dir(article_dir):
+def check_dir(dataset, article_dir):
     pdf_files = glob.glob(article_dir + '*.pdf')
     output_str = "Articles in directory:\n\n"
     for article in pdf_files:
-        is_read = check_article(article.split('/')[1])
+        is_read = check_article(dataset, article.split('/')[1])
         output_str += '{}...........{}\n'.format(article, is_read)
 
     print(output_str)
